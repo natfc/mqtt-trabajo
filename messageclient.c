@@ -7,6 +7,7 @@
 #include "uthash.h"
 
 const int MIN_TIME_BETWEEN_HASHTABLE_ITERATIONS = 20;
+#define TABLE_SIZE 10
 
 void on_connect(struct mosquitto *mosq, void *obj, int reason_code)
 {
@@ -25,6 +26,20 @@ void on_subscribe(struct mosquitto *mosq, void *obj,
         printf("on_subscribe: %d:granted qos = %d\n", i, granted_qos[i]);
     }
 }
+void on_regular_message(struct mosquitto *mosq, void *obj,
+                        const struct mosquitto_message *msg)
+{
+    printf("%s %d %s\n", msg->topic, msg->qos, (char *)msg->payload);
+}
+
+void on_heartbeat_message(struct mosquitto *mosq, void *obj,
+                          const struct mosquitto_message *msg)
+{
+    // TODO update the hash table
+
+}
+
+
 void on_message(struct mosquitto *mosq, void *obj,
                 const struct mosquitto_message *msg)
 {
@@ -39,18 +54,6 @@ void on_message(struct mosquitto *mosq, void *obj,
     }
 }
 
-void on_regular_message(struct mosquitto *mosq, void *obj,
-                        const struct mosquitto_message *msg)
-{
-    printf("%s %d %s\n", msg->topic, msg->qos, (char *)msg->payload);
-}
-
-void on_heartbeat_message(struct mosquitto *mosq, void *obj,
-                          const struct mosquitto_message *msg)
-{
-    // TODO update the hash table
-}
-
 // Define the User structure
 typedef struct
 {
@@ -59,7 +62,9 @@ typedef struct
     UT_hash_handle hh;  // Makes this structure hashable
 } User;
 
-User *users = NULL; // Initialize the hash table for users
+User *users = NULL, *user, *current_user; // Initialize the hash table for users
+time_t timeout = 10; // Set the timeout for 10 seconds
+time_t current_time; // Set the current time
 
 // Add or update a user in the hash table
 void addOrUpdateUser(const char *username)
@@ -69,7 +74,7 @@ void addOrUpdateUser(const char *username)
     // Try to find an existing user
     HASH_FIND_STR(users, username, user);
     if (user == NULL)
-    {
+    {   
         // User not found, create a new user
         user = (User *)malloc(sizeof(User));
         strncpy(user->username, username, sizeof(user->username));
@@ -112,9 +117,16 @@ void deleteUser(const char *username)
 }
 
 // Iterate through the hash table, deleting users that haven't sent a heartbeat for more than the set delay
-void iterateHashTable(void)
-{
-    // TODO
+void iterateHashTable(hh, users, user, current_user)
+{   // Check if the user has exceeded the timeout
+    if (difftime(current_time, getLastActive(user))>timeout){
+        printf("Removing user: %s (inactive)\n", user->username);
+        deleteUser(user) // Delete the entry from the hash table
+        free((char *) user->username); // Free the key string, the entry is freed in deleteUser()
+    } else {
+        // User is still active, print their details
+        printf("Active user: %s, Last Heartbeat: %ld\n", user->username, user->last_active)
+    }
 }
 
 int main(int argc, char *argv[])
