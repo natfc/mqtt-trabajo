@@ -36,6 +36,10 @@ void on_heartbeat_message(struct mosquitto *mosq, void *obj,
                           const struct mosquitto_message *msg)
 {
     // TODO update the hash table
+    char user_id[50];
+    sscanf(msg->topic, "heartbeat/%49s", user_id); // Make a new topic specifically for heartbeat messages: heartbeat/
+    addOrUpdateUser(user_id); // Extracts the user id from the topic using sscanf, and then updates the hash table using addOrUpdateUser
+    printf("Heartbeat recieved from %s\n", user_id);
 
 }
 
@@ -44,13 +48,15 @@ void on_message(struct mosquitto *mosq, void *obj,
                 const struct mosquitto_message *msg)
 {
     // TODO filter whether it is a regular message or a heartbeat message
-    if (1)
-    {
-        on_regular_message(mosq, obj, msg);
-    }
-    else
+    // checks if the topic of the message is the same as the topic for a heartbeat message
+    if (strncmp(msg->topic, "heartbeat/", 10) == 0)
     {
         on_heartbeat_message(mosq, obj, msg);
+    }
+    else
+    // if it is not a heartbeat message it is a regular message
+    {
+        on_regular_message(mosq, obj, msg);
     }
 }
 
