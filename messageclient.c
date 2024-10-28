@@ -9,57 +9,6 @@
 const int MIN_TIME_BETWEEN_HASHTABLE_ITERATIONS = 20;
 #define TABLE_SIZE 10
 
-void on_connect(struct mosquitto *mosq, void *obj, int reason_code)
-{
-    //
-    printf("on_connect: %s\n", mosquitto_connack_string(reason_code));
-}
-void on_disconnect(struct mosquitto *mosq, void *obj, int reason_code)
-{
-    printf("on_disconnect: %s\n", mosquitto_connack_string(reason_code));
-}
-void on_subscribe(struct mosquitto *mosq, void *obj,
-                  int mid, int qos_count, const int *granted_qos)
-{
-    for (int i = 0; i < qos_count; i++)
-    {
-        printf("on_subscribe: %d:granted qos = %d\n", i, granted_qos[i]);
-    }
-}
-void on_regular_message(struct mosquitto *mosq, void *obj,
-                        const struct mosquitto_message *msg)
-{
-    printf("%s %d %s\n", msg->topic, msg->qos, (char *)msg->payload);
-}
-
-void on_heartbeat_message(struct mosquitto *mosq, void *obj,
-                          const struct mosquitto_message *msg)
-{
-    // TODO update the hash table
-    char user_id[50];
-    sscanf(msg->topic, "heartbeat/%49s", user_id); // Make a new topic specifically for heartbeat messages: heartbeat/
-    addOrUpdateUser(user_id); // Extracts the user id from the topic using sscanf, and then updates the hash table using addOrUpdateUser
-    printf("Heartbeat recieved from %s\n", user_id);
-
-}
-
-
-void on_message(struct mosquitto *mosq, void *obj,
-                const struct mosquitto_message *msg)
-{
-    // TODO filter whether it is a regular message or a heartbeat message
-    // checks if the topic of the message is the same as the topic for a heartbeat message
-    if (strncmp(msg->topic, "heartbeat/", 10) == 0)
-    {
-        on_heartbeat_message(mosq, obj, msg);
-    }
-    else
-    // if it is not a heartbeat message it is a regular message
-    {
-        on_regular_message(mosq, obj, msg);
-    }
-}
-
 // Define the User structure
 typedef struct
 {
@@ -123,17 +72,68 @@ void deleteUser(const char *username)
 }
 
 // Iterate through the hash table, deleting users that haven't sent a heartbeat for more than the set delay
-void iterateHashTable(hh, users, user, current_user)
+void iterateHashTable()
 {   // Check if the user has exceeded the timeout
     if (difftime(current_time, getLastActive(user))>timeout){
         printf("Removing user: %s (inactive)\n", user->username);
-        deleteUser(user) // Delete the entry from the hash table
+        deleteUser(user); // Delete the entry from the hash table
         free((char *) user->username); // Free the key string, the entry is freed in deleteUser()
     } else {
         // User is still active, print their details
-        printf("Active user: %s, Last Heartbeat: %ld\n", user->username, user->last_active)
+        printf("Active user: %s, Last Heartbeat: %ld\n", user->username, user->last_active);
     }
 }
+
+void on_connect(struct mosquitto *mosq, void *obj, int reason_code)
+{
+    //
+    printf("on_connect: %s\n", mosquitto_connack_string(reason_code));
+}
+void on_disconnect(struct mosquitto *mosq, void *obj, int reason_code)
+{
+    printf("on_disconnect: %s\n", mosquitto_connack_string(reason_code));
+}
+void on_subscribe(struct mosquitto *mosq, void *obj,
+                  int mid, int qos_count, const int *granted_qos)
+{
+    for (int i = 0; i < qos_count; i++)
+    {
+        printf("on_subscribe: %d:granted qos = %d\n", i, granted_qos[i]);
+    }
+}
+void on_regular_message(struct mosquitto *mosq, void *obj,
+                        const struct mosquitto_message *msg)
+{
+    printf("%s %d %s\n", msg->topic, msg->qos, (char *)msg->payload);
+}
+
+void on_heartbeat_message(struct mosquitto *mosq, void *obj,
+                          const struct mosquitto_message *msg)
+{
+    // TODO update the hash table
+    char user_id[50];
+    sscanf(msg->topic, "heartbeat/%49s", user_id); // Make a new topic specifically for heartbeat messages: heartbeat/
+    addOrUpdateUser(user_id); // Extracts the user id from the topic using sscanf, and then updates the hash table using addOrUpdateUser
+    printf("Heartbeat recieved from %s\n", user_id);
+}
+
+
+void on_message(struct mosquitto *mosq, void *obj,
+                const struct mosquitto_message *msg)
+{
+    // TODO filter whether it is a regular message or a heartbeat message
+    // checks if the topic of the message is the same as the topic for a heartbeat message
+    if (strncmp(msg->topic, "heartbeat/", 10) == 0)
+    {
+        on_heartbeat_message(mosq, obj, msg);
+    }
+    else
+    // if it is not a heartbeat message it is a regular message
+    {
+        on_regular_message(mosq, obj, msg);
+    }
+}
+
 
 int main(int argc, char *argv[])
 {
