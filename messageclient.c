@@ -160,6 +160,23 @@ void deleteUser(const char *username) {
 //     }
 // }
 
+void displayConnectedUsers() {
+    User *current_user, *tmp;
+    int user_count = 0;
+
+    printf("Currently connected users:\n");
+    HASH_ITER(hh, users, current_user, tmp) {
+        user_count++;
+        printf("Username: %s, Last Active: %ld seconds ago\n", 
+               current_user->username, 
+               (long)(time(NULL) - current_user->last_active));
+    }
+
+    if (user_count == 0) {
+        printf("No active users.\n");
+    }
+}
+
 void iterateHashTable() {
   User *current_user, *tmp;
   current_time = time(NULL); // Update the current time
@@ -258,6 +275,7 @@ void handleCommand(mpc_ast_t *output, struct mosquitto *mosq, char *line) {
     printf("Command recognized: /lista\n");
     mpc_ast_print(output);
     // Handle listing logic here.
+    displayConnectedUsers();
   } else {
     // Handle general message
     // printf(("This is the tree \n"));
