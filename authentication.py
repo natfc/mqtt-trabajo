@@ -1,31 +1,61 @@
 import paho.mqtt.client as mqtt
+import requests
 import ssl
 
-# Define the broker settings
+# Define MQTT and Authentication Server settings
 BROKER = "yourbroker.com"
 PORT = 8883
+AUTH_SERVER = "https://authserver.com/api/login"  # Endpoint to authenticate users
 
-# Define credentials
+# User credentials (replace with actual credentials)
 USERNAME = "user"
-PASSWORD = "password"  # Or a JWT
+PASSWORD = "password"
+
+def authenticate_with_server(username, password):
+    """Authenticate with the authentication server and get a token."""
+    payload = {'username': username, 'password': password}
+    response = requests.post(AUTH_SERVER, json=payload)
+    
+    # Check if the request was successful and return the token
+    if response.status_code == 200:
+        token = response.json().get("token")  # Assuming token is in response JSON
+        return token
+    else:
+        print("Authentication failed:", response.status_code, response.text)
+        return None
 
 def on_connect(client, userdata, flags, rc):
-    print("Connected with result code " + str(rc))
-    client.subscribe("chat/public/#")
+    """Callback when connected to MQTT broker."""
+    if rc == 0:
+        print("Connected successfully to broker.")
+        client.subscribe("chat/public/#")
+    else:
+        print("Failed to connect, return code %d\n", rc)
 
-# Initialize client
-client = mqtt.Client()
+# Authenticate with the server and get a token
+auth_token = authenticate_with_server(USERNAME, PASSWORD)
 
-# Set TLS settings
-client.tls_set(ca_certs="/path/to/ca.crt", certfile="/path/to/client.crt",
-               keyfile="/path/to/client.key", tls_version=ssl.PROTOCOL_TLSv1_2)
-client.tls_insecure_set(False)  # True for self-signed certs, False for production
+if auth_token:
+    # Initialize MQTT client
+    client = mqtt.Client()
 
-# Set credentials
-client.username_pw_set(USERNAME, PASSWORD)
+    # Set TLS settings
+    client.tls_set(ca_certs="/opt/homebrew/etc/mosquitto/certs/ca.crt", 
+                   certfile="/opt/homebrew/etc/mosquitto/certs/server.crt", 
+                   keyfile="/opt/homebrew/etc/mosquitto/certs/server.key", 
+                   tls_version=ssl.PROTOCOL_TLSv1_2)
+    client.tls_insecure_set(False)  # Set to True only for testing self-signed certs
 
-client.on_connect = on_connect
+    # Set credentials for MQTT (use the token as password)
+    client.username_pw_set(USERNAME, auth_token)
 
-# Connect and loop forever
-client.connect(BROKER, PORT, 60)
-client.loop_forever()
+    # Define callback functions
+    client.on_connect = on_connect
+
+    # Connect to the MQTT broker
+    client.connect(BROKER, PORT, 60)
+
+    # Start MQTT loop to process messages
+    client.loop_forever()
+else:
+    print("Failed to authenticate with the server. Exiting.")
