@@ -87,7 +87,7 @@ void on_disconnect(struct mosquitto *mosq, void *obj, int reason_code) {
 void on_subscribe(struct mosquitto *mosq, void *obj, int mid, int qos_count,
                   const int *granted_qos) {
   for (int i = 0; i < qos_count; i++) {
-    printf("on_subscribe: %d:granted qos = %d\n", i, granted_qos[i]);
+    // printf("on_subscribe: %d:granted qos = %d\n", i, granted_qos[i]);
   }
 }
 void on_regular_message(struct mosquitto *mosq, void *obj,
@@ -167,20 +167,30 @@ void iterateHashTable() {
   HASH_ITER(hh, users, current_user, tmp) {
     // Check if the user has exceeded the timeout
     if (difftime(current_time, current_user->last_active) > timeout) {
-      printf("Removing user: %s (inactive)\n", current_user->username);
+      // printf("Removing user: %s (inactive)\n", current_user->username);
       HASH_DEL(users, current_user); // Delete the entry from the hash table
       free(current_user);            // Free the memory allocated for the user
     } else {
       // User is still active, print their details
-      printf("Active user: %s, Last Heartbeat: %ld\n", current_user->username,
-             current_user->last_active);
+      // printf("Active user: %s, Last Heartbeat: %ld\n", current_user->username,
+            //  current_user->last_active);
     }
   }
 }
 
 void handleCommand(mpc_ast_t *output, struct mosquitto *mosq, char *line) {
   if (searchAst(output, "salir") || strstr(output->tag, "salir") != NULL) {
-    printf("Command recognized: /salir\n");
+    // printf("Command recognized: /salir\n");
+    int rc = mosquitto_disconnect(mosq);
+    if (rc != MOSQ_ERR_SUCCESS) {
+      // mosquitto_destroy(mosq);
+      fprintf(stderr, "Error: %s\n", mosquitto_strerror(rc));
+    } else {
+      mosquitto_destroy(mosq);
+      mosquitto_lib_cleanup();
+      exit(EXIT_SUCCESS);
+    }
+    
 
     mpc_ast_print(output);
     // Handle exit logic here, e.g., break the loop or set a flag to exit.
@@ -195,36 +205,36 @@ void handleCommand(mpc_ast_t *output, struct mosquitto *mosq, char *line) {
     // printf("Contents: %s\n", output->contents);
     // printf("Number of children: %i\n", output->children_num);
 
-    mpc_ast_t *c1 = output->children[1];
+    // mpc_ast_t *c1 = output->children[1];
     // printf("First Child Tag: %s\n", c1->tag);
     // printf("First Child Contents: %s\n", c1->contents);
     // printf("First Child Number of children: %i\n",
     // c1->children_num);
 
-    printf("Private message \n");
-    mpc_ast_print(output);
+    // printf("Private message \n");
+    // mpc_ast_print(output);
     mpc_ast_t *command_node = output->children[1];
-    printf("\n");
+    // printf("\n");
 
-    mpc_ast_print(command_node);
+    // mpc_ast_print(command_node);
 
     if (command_node) {
-      printf("command_node not null");
+      // printf("command_node not null");
       // Extracting the id field from the "privado" command
-      printf("Tag: %s\n", command_node->tag);
-      printf("Contents: %s\n", command_node->contents);
-      printf("Number of children: %i\n", command_node->children_num);
+      // printf("Tag: %s\n", command_node->tag);
+      // printf("Contents: %s\n", command_node->contents);
+      // printf("Number of children: %i\n", command_node->children_num);
 
       mpc_ast_t *id_node = command_node->children[2];
       mpc_ast_t *message_node = command_node->children[3];
-      printf("First Child Tag: %s\n", c1->tag);
-      printf("First Child Contents: %s\n", c1->contents);
-      printf("First Child Number of children: %i\n", c1->children_num);
+      // printf("First Child Tag: %s\n", c1->tag);
+      // printf("First Child Contents: %s\n", c1->contents);
+      // printf("First Child Number of children: %i\n", c1->children_num);
       // mpc_ast_t* id_node = mpc_ast_get_child(command_node, "id");
       // mpc_ast_t* message_node = mpc_ast_get_child(command_node, "message");
 
       if (id_node && message_node) {
-        printf("id_node && message_node \n");
+        // printf("id_node && message_node \n");
         // The "contents" field contains the actual text value of the node
         char *id = id_node->contents;
         char *message = message_node->contents;
@@ -250,7 +260,7 @@ void handleCommand(mpc_ast_t *output, struct mosquitto *mosq, char *line) {
     // Handle listing logic here.
   } else {
     // Handle general message
-    printf(("This is the tree \n"));
+    // printf(("This is the tree \n"));
     // char* message = output->children[1]->children[1]->contents;
     // Remove newline character at the end of the line
     size_t len = strlen(line);
@@ -262,7 +272,7 @@ void handleCommand(mpc_ast_t *output, struct mosquitto *mosq, char *line) {
     if (rc != MOSQ_ERR_SUCCESS) {
       fprintf(stderr, "Error publishing: %s\n", mosquitto_strerror(rc));
     }
-    printf("Message received: %s\n", output->contents);
+    // printf("Message received: %s\n", output->contents);
   }
   // mpc_ast_delete(output);
 }
@@ -314,6 +324,13 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Error: %s\n", mosquitto_strerror(rc));
     return 1;
   }
+
+  char will[128];
+  /* Set a will, before calling mosquitto_connect. */
+    snprintf(will, sizeof(will), "%s has disconnected unexpectedly.",
+           username);
+    rc = mosquitto_will_set(mosq, "upv/SCI/martinnathan/main", strlen(will), will, 2, false);
+
   /* Connect to test.mosquitto.org on port 1883, with a keepalive of 60 seconds.
    */
   rc = mosquitto_connect(mosq, "test.mosquitto.org", 1883, 60);
@@ -357,7 +374,6 @@ int main(int argc, char *argv[]) {
   if (!parser) {
     return 1; // Exit if parser failed to initialize
   }
-  printf("Right before main loop \n"); // TODO Remove that
   /* main loop */
   while (1) {
     // get input from user
@@ -365,7 +381,7 @@ int main(int argc, char *argv[]) {
       break;
     else {
       printf("Message received \n");
-      // TODO parse the commands from the user
+      // parse the commands from the user
       handleInput(line, parser, mosq);
       // int rc = mosquitto_publish(mosq, NULL, "upv/SCI/martinnathan/main",
       //                            strlen(line), line, 0, false);
@@ -374,7 +390,7 @@ int main(int argc, char *argv[]) {
       if (rc != MOSQ_ERR_SUCCESS) {
         fprintf(stderr, "Error publishing: %s\n", mosquitto_strerror(rc));
       }
-      printf("After the nested error check \n");
+      // printf("After the nested error check \n");
     }
 
     // every y seconds, iterate through the hash table, and deleteUser() if the
@@ -382,10 +398,10 @@ int main(int argc, char *argv[]) {
 
     if (difftime(time(NULL), last_hashtable_iteration) >
         MIN_TIME_BETWEEN_HASHTABLE_ITERATIONS) {
-      printf("Difftime was successful \n");
+      // printf("Difftime was successful \n");
       // iterate through the hash table
       iterateHashTable();
-      printf("IterateHashTable was successful \n");
+      // printf("IterateHashTable was successful \n");
     }
   }
 }
