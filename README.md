@@ -2,7 +2,8 @@
 
 This is a messaging application using the Mosquitto message broker. At the moment, it uses the Mosquitto public test server (test.mosquitto.org) on the port 1883 (uncrypted, unauthenticated).
 
-To compile, run `gcc -std=c99 -Wall messageclient.c parser.c mpc.c -ledit -lmosquitto -lm -o messageclient`
+To compile, run `gcc -std=c99 -Wall messageclient.c parser.c mpc.c -ledit -lmosquitto -lm -o messageclient`.
+
 To run, run `./messageclient`
 
 ### Commands
