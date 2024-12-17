@@ -1,11 +1,8 @@
 # mqtt-trabajo
 
-every message is sent to the upv/SCI/martinnathan topic with qos 2
-regular messages will have retain=true
-connection/disconnection messages will have retain=false
-last will messages (for unexpected disconnections) will have retain=false
+Every message is sent to the upv/SCI/nathanmartin topic with qos 2
 
-to implement commands, we will need to implement a parser
+To run, run messageclient
 
 the /salir command will use the mosquitto_disconnect method to disconnect gracefully
 
@@ -15,3 +12,11 @@ to implement to /lista command, we will need to make every user send a heartbeat
 
 TODO: use an encrypted/with auth server
 TODO: add an extra feature
+
+## Credits
+
+This project uses code licensed under the BSD license by [Daniel Holden](https://github.com/orangeduck) (the mpc parser).  
+Copyright (c) 2013, Daniel Holden. All rights reserved.
+
+This project uses code licensed under a custom MIT-style license by [Troy D. Hanson](https://troydhanson.github.io/uthash/).  
+Copyright (c) 2005-2022, Troy D. Hanson. All rights reserved.
