@@ -1,17 +1,19 @@
 # mqtt-trabajo
 
-Every message is sent to the upv/SCI/nathanmartin topic with qos 2
+This is a messaging application using the Mosquitto message broker. At the moment, it uses the Mosquitto public test server (test.mosquitto.org) on the port 1883 (uncrypted, unauthenticated).
 
-To run, run messageclient
+To compile, run `gcc -std=c99 -Wall messageclient.c parser.c mpc.c -ledit -lmosquitto -lm -o messageclient`
+To run, run `./messageclient`
 
-the /salir command will use the mosquitto_disconnect method to disconnect gracefully
+### Commands
 
-to implement the /privado command, we will make every user subscribe to the upv/SCI/martinnathan/username topic, using the /privado username command will send a message to that topic
+- `/lista` prints a list of all connected users
+- `/privado id message` sends a private message to a user whose id is `id`
+- `/salir` disconnects you gracefully
 
-to implement to /lista command, we will need to make every user send a heartbeat message to the upv/SCI/martinnathan/heartbeat topic every x seconds. Every client is subscribed to this topic, and updates their own hashmap (we use uthash) of connected users
+### WIP
 
-TODO: use an encrypted/with auth server
-TODO: add an extra feature
+Add a self-hosted server with encryption and authentication.
 
 ## Credits
 
