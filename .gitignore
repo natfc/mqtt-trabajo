@@ -2,3 +2,6 @@
 messageclient
 publisher.c
 .gitignore
+parsing
+parsing2
+/old

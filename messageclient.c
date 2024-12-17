@@ -25,6 +25,22 @@ User *users = NULL, *user, *current_user; // Initialize the hash table for users
 time_t timeout = 10;                      // Set the timeout for 10 seconds
 time_t current_time;                      // Set the current time
 
+void displayConnectedUsers() {
+  User *current_user, *tmp;
+  int user_count = 0;
+
+  printf("Currently connected users:\n");
+  HASH_ITER(hh, users, current_user, tmp) {
+    user_count++;
+    printf("Username: %s, Last Active: %ld seconds ago\n", current_user->username,
+           (long)(time(NULL) - current_user->last_active));
+  }
+
+  if (user_count == 0) {
+    printf("No active users.\n");
+  }
+}
+
 // Add or update a user in the hash table
 void addOrUpdateUser(const char *username) {
   User *user;
@@ -55,7 +71,7 @@ void *heartbeat_thread_func(void *mosq_ptr) {
              username);
 
     // Publish the heartbeat message
-    mosquitto_publish(mosq, NULL, "upv/SCI/martinnathan/heartbeat",
+    mosquitto_publish(mosq, NULL, "upv/SCI/nathanmartin/heartbeat",
                       strlen(heartbeat_message), heartbeat_message, 0, false);
 
     // printf("Sent heartbeat: %s\n", heartbeat_message);
@@ -74,15 +90,22 @@ void on_connect(struct mosquitto *mosq, void *obj, int reason_code) {
     return;
   }
 
-  printf("on_connect: %s\n", mosquitto_connack_string(reason_code));
+  // printf("on_connect: %s\n", mosquitto_connack_string(reason_code));
 
   // Add or update the user in the hash table with their username
   addOrUpdateUser(username);
 
   printf("Welcome, %s! You are now connected.\n", username);
+  char connection_notice[100];
+  sprintf(connection_notice, "%s has connected.", username);
+  int rc = mosquitto_publish(mosq, NULL, "upv/SCI/nathanmartin/main",
+                               strlen(connection_notice), connection_notice, 2, false);
+    if (rc != MOSQ_ERR_SUCCESS) {
+      fprintf(stderr, "Error publishing: %s\n", mosquitto_strerror(rc));
+    }
 }
 void on_disconnect(struct mosquitto *mosq, void *obj, int reason_code) {
-  printf("on_disconnect: %s\n", mosquitto_connack_string(reason_code));
+  // printf("on_disconnect: %s\n", mosquitto_connack_string(reason_code));
 }
 void on_subscribe(struct mosquitto *mosq, void *obj, int mid, int qos_count,
                   const int *granted_qos) {
@@ -92,7 +115,8 @@ void on_subscribe(struct mosquitto *mosq, void *obj, int mid, int qos_count,
 }
 void on_regular_message(struct mosquitto *mosq, void *obj,
                         const struct mosquitto_message *msg) {
-  printf("%s %d %s\n", msg->topic, msg->qos, (char *)msg->payload);
+  // printf("%s %d %s\n", msg->topic, msg->qos, (char *)msg->payload);
+  printf("%s\n", (char *)msg->payload);
 }
 
 void on_heartbeat_message(struct mosquitto *mosq, void *obj,
@@ -114,7 +138,7 @@ void on_message(struct mosquitto *mosq, void *obj,
   // filter whether it is a regular message or a heartbeat message
   // checks if the topic of the message is the same as the topic for a heartbeat
   // message
-  if (strcmp(msg->topic, "upv/SCI/martinnathan/heartbeat") == 0) {
+  if (strcmp(msg->topic, "upv/SCI/nathanmartin/heartbeat") == 0) {
     on_heartbeat_message(mosq, obj, msg);
   } else
   // if it is not a heartbeat message it is a regular message
@@ -181,7 +205,15 @@ void iterateHashTable() {
 void handleCommand(mpc_ast_t *output, struct mosquitto *mosq, char *line) {
   if (searchAst(output, "salir") || strstr(output->tag, "salir") != NULL) {
     // printf("Command recognized: /salir\n");
-    int rc = mosquitto_disconnect(mosq);
+    char disconnection_notice[100];
+    sprintf(disconnection_notice, "%s has disconnected.", username);
+    int rc = mosquitto_publish(mosq, NULL, "upv/SCI/nathanmartin/main",
+                               strlen(disconnection_notice), disconnection_notice, 2, false);
+    sleep(1);
+    if (rc != MOSQ_ERR_SUCCESS) {
+      fprintf(stderr, "Error publishing: %s\n", mosquitto_strerror(rc));
+    }
+    rc = mosquitto_disconnect(mosq);
     if (rc != MOSQ_ERR_SUCCESS) {
       // mosquitto_destroy(mosq);
       fprintf(stderr, "Error: %s\n", mosquitto_strerror(rc));
@@ -192,7 +224,7 @@ void handleCommand(mpc_ast_t *output, struct mosquitto *mosq, char *line) {
     }
     
 
-    mpc_ast_print(output);
+    // mpc_ast_print(output);
     // Handle exit logic here, e.g., break the loop or set a flag to exit.
   } else if (searchAst(output, "privado") ||
              strstr(output->tag, "privado") != NULL) {
@@ -243,20 +275,25 @@ void handleCommand(mpc_ast_t *output, struct mosquitto *mosq, char *line) {
         // printf("Message: %s\n", message);
         // publish the message to the right channel
         char privado_topic[100];
+        char private_message_prefix[100];
+        char formatted_message[512];
+        snprintf(private_message_prefix, 100,"%s (private): ", username);
+        sprintf(formatted_message, "%s%s", private_message_prefix, message);
         snprintf(privado_topic, sizeof(privado_topic),
-                 "upv/SCI/martinnathan/%s", id);
-        int rc = mosquitto_publish(mosq, NULL, privado_topic, strlen(message),
-                                   message, 2, true);
+                 "upv/SCI/nathanmartin/%s", id);
+        int rc = mosquitto_publish(mosq, NULL, privado_topic, strlen(formatted_message),
+                                   formatted_message, 2, false);
         if (rc != MOSQ_ERR_SUCCESS) {
           fprintf(stderr, "Error publishing: %s\n", mosquitto_strerror(rc));
-        }
+        } 
       }
     }
     // Handle private message logic here.
   } else if (searchAst(output, "lista") ||
              strstr(output->tag, "lista") != NULL) {
-    printf("Command recognized: /lista\n");
-    mpc_ast_print(output);
+    // printf("Command recognized: /lista\n");
+    // mpc_ast_print(output);
+    displayConnectedUsers();
     // Handle listing logic here.
   } else {
     // Handle general message
@@ -267,8 +304,12 @@ void handleCommand(mpc_ast_t *output, struct mosquitto *mosq, char *line) {
     if (len > 0 && line[len - 1] == '\n') {
       line[len - 1] = '\0';
     }
-    int rc = mosquitto_publish(mosq, NULL, "upv/SCI/martinnathan/main",
-                               strlen(line), line, 2, true);
+    char message_prefix[100];
+    char formatted_message[512];
+    snprintf(message_prefix, 100,"%s: ", username);
+    sprintf(formatted_message, "%s%s", message_prefix, line);
+    int rc = mosquitto_publish(mosq, NULL, "upv/SCI/nathanmartin/main",
+                               strlen(formatted_message), formatted_message, 2, false);
     if (rc != MOSQ_ERR_SUCCESS) {
       fprintf(stderr, "Error publishing: %s\n", mosquitto_strerror(rc));
     }
@@ -308,7 +349,7 @@ int main(int argc, char *argv[]) {
     return 1; // Exit if no valid username is provided
   }
 
-  mosq = mosquitto_new(NULL, true, NULL);
+  mosq = mosquitto_new(username, false, NULL);
   if (mosq == NULL) {
     fprintf(stderr, "Error: Out of memory.\n");
     return 1;
@@ -329,7 +370,7 @@ int main(int argc, char *argv[]) {
   /* Set a will, before calling mosquitto_connect. */
     snprintf(will, sizeof(will), "%s has disconnected unexpectedly.",
            username);
-    rc = mosquitto_will_set(mosq, "upv/SCI/martinnathan/main", strlen(will), will, 2, false);
+    rc = mosquitto_will_set(mosq, "upv/SCI/nathanmartin/main", strlen(will), will, 2, false);
 
   /* Connect to test.mosquitto.org on port 1883, with a keepalive of 60 seconds.
    */
@@ -340,19 +381,19 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   /* Subscribe to the main topic */
-  rc = mosquitto_subscribe(mosq, NULL, "upv/SCI/martinnathan/main", 2);
+  rc = mosquitto_subscribe(mosq, NULL, "upv/SCI/nathanmartin/main", 2);
   if (rc != MOSQ_ERR_SUCCESS) {
     fprintf(stderr, "Error subscribing: %s\n", mosquitto_strerror(rc));
   }
   /* Subscribe to the heartbeat topic */
-  rc = mosquitto_subscribe(mosq, NULL, "upv/SCI/martinnathan/heartbeat", 1);
+  rc = mosquitto_subscribe(mosq, NULL, "upv/SCI/nathanmartin/heartbeat", 1);
   if (rc != MOSQ_ERR_SUCCESS) {
     fprintf(stderr, "Error subscribing: %s\n", mosquitto_strerror(rc));
   }
 
   /* Subscribe to the personal topic */
   char privado_topic[100];
-  snprintf(privado_topic, sizeof(privado_topic), "upv/SCI/martinnathan/%s",
+  snprintf(privado_topic, sizeof(privado_topic), "upv/SCI/nathanmartin/%s",
            username);
   rc = mosquitto_subscribe(mosq, NULL, privado_topic, 2);
   if (rc != MOSQ_ERR_SUCCESS) {
@@ -380,19 +421,17 @@ int main(int argc, char *argv[]) {
     if (fgets(line, 100, stdin) == NULL)
       break;
     else {
-      printf("Message received \n");
+      // printf("Message received \n");
       // parse the commands from the user
       handleInput(line, parser, mosq);
-      // int rc = mosquitto_publish(mosq, NULL, "upv/SCI/martinnathan/main",
+      // int rc = mosquitto_publish(mosq, NULL, "upv/SCI/nathanmartin/main",
       //                            strlen(line), line, 0, false);
       // printf("Message published \n");
-
       if (rc != MOSQ_ERR_SUCCESS) {
         fprintf(stderr, "Error publishing: %s\n", mosquitto_strerror(rc));
       }
       // printf("After the nested error check \n");
     }
-
     // every y seconds, iterate through the hash table, and deleteUser() if the
     // last_active time_t is too old.
 

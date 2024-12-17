@@ -78,7 +78,7 @@ int parseInput(char *input, mpc_parser_t *parser, mpc_result_t *r) {
         //     // printf("%d", found);
         // }
         // mpc_ast_delete(r->output);
-        printf("1");
+        // printf("1");
         return 1;
     } else {
         /* Otherwise print and delete the Error */
